@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบแจ้งเตรียมงาน Lock Heat/Cert</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --bg:#f2f2f7;--surface:#fff;--surface2:#f2f2f7;
+  --border:rgba(0,0,0,.09);--border-med:rgba(0,0,0,.14);
+  --text:#1c1c1e;--text2:#6e6e73;--text3:#aeaeb2;
+  --blue:#007aff;--blue-bg:#e5f0ff;
+  --green:#34c759;--green-bg:#e6f9ed;--green-text:#1a6b35;
+  --orange:#ff9f0a;--orange-bg:#fff4e0;--orange-text:#7a4a00;
+  --purple:#af52de;--purple-bg:#f5eeff;--purple-text:#5c007a;
+  --red:#ff3b30;--red-bg:#fff0ef;--red-text:#c0392b;
+  --navy:#1a3a5c;--navy-bg:#e8eef5;--navy-text:#1a3a5c;
+  --gray-bg:#e5e5ea;
+  --radius:10px;--radius-lg:14px;
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;
+  --font-d:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh-md:0 4px 16px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;}
+
+/* HEADER */
+.header{background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--border-med);padding:0 28px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.header-title{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:-.4px;}
+.header-actions{display:flex;gap:8px;align-items:center;}
+.hbtn{display:flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:var(--radius);border:.5px solid var(--border-med);background:var(--surface);font-size:13px;font-weight:500;font-family:var(--font);color:var(--text);cursor:pointer;transition:all .15s;}
+.hbtn:hover{background:var(--surface2);}
+.hbtn svg{width:15px;height:15px;flex-shrink:0;}
+.hbtn.primary{background:var(--text);color:white;border-color:transparent;}
+.hbtn.primary:hover{background:#3a3a3c;}
+
+/* MAIN */
+.main{max-width:1600px;margin:0 auto;padding:20px 24px 60px;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat{background:var(--surface);border-radius:var(--radius-lg);padding:18px 20px;border:.5px solid var(--border);box-shadow:var(--sh);display:flex;align-items:center;gap:14px;}
+.stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.stat-icon svg{width:20px;height:20px;}
+.stat-num{font-size:28px;font-weight:700;font-family:var(--font-d);letter-spacing:-.8px;line-height:1;}
+.stat-lbl{font-size:12px;color:var(--text2);margin-top:3px;}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+.search-wrap{flex:1;position:relative;}
+.search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text3);pointer-events:none;}
+.search-in{width:100%;height:38px;border-radius:var(--radius);border:.5px solid var(--border-med);background:var(--surface);padding:0 12px 0 36px;font-size:14px;font-family:var(--font);color:var(--text);outline:none;transition:.15s;}
+.search-in:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.12);}
+.status-sel{height:38px;padding:0 30px 0 12px;border-radius:var(--radius);border:.5px solid var(--border-med);background:var(--surface);font-size:13px;font-family:var(--font);color:var(--text);outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236e6e73'%3E%3Cpath d='M8 10L3 5h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:14px;}
+
+/* TABLE */
+.table-wrap{background:var(--surface);border-radius:var(--radius-lg);border:.5px solid var(--border);box-shadow:var(--sh);overflow:hidden;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead tr{background:var(--surface2);border-bottom:.5px solid var(--border-med);}
+th{padding:10px 12px;text-align:left;font-size:11.5px;font-weight:600;color:var(--text2);letter-spacing:.2px;white-space:nowrap;user-select:none;}
+tbody tr{border-bottom:.5px solid var(--border);transition:background .12s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:#fafafa;}
+td{padding:9px 12px;vertical-align:middle;white-space:nowrap;}
+td.wrap{white-space:normal;max-width:220px;}
+
+/* STATUS */
+.status-inline{appearance:none;border:none;background:transparent;font-size:11.5px;font-weight:600;font-family:var(--font);cursor:pointer;outline:none;padding:4px 20px 4px 10px;border-radius:20px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='%23888'%3E%3Cpath d='M6 7.5L2 3.5h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;background-size:10px;}
+.status-inline.pending{background-color:var(--red-bg);color:var(--red-text);}
+.status-inline.inprogress{background-color:var(--blue-bg);color:#004a99;}
+.status-inline.done{background-color:var(--green-bg);color:var(--green-text);}
+
+/* FILE CELL */
+.file-cell{display:flex;flex-direction:column;gap:4px;min-width:100px;}
+.file-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:11.5px;font-weight:500;cursor:pointer;border:none;font-family:var(--font);transition:all .15s;text-decoration:none;white-space:nowrap;max-width:130px;}
+.file-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.file-btn svg{width:12px;height:12px;flex-shrink:0;}
+.file-btn.img-btn{background:var(--navy-bg);color:var(--navy-text);}
+.file-btn.img-btn:hover{background:#d0dce8;}
+.file-btn.cert-btn{background:var(--navy-bg);color:var(--navy-text);}
+.file-btn.cert-btn:hover{background:#d0dce8;}
+.file-btn.empty{background:var(--surface2);color:var(--text3);cursor:default;}
+.upload-inline-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;border:.5px dashed var(--border-med);background:transparent;font-family:var(--font);color:var(--text3);transition:all .15s;}
+.upload-inline-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-bg);}
+.upload-inline-btn svg{width:11px;height:11px;}
+
+/* ACT BTNS */
+.act-wrap{display:flex;align-items:center;gap:2px;}
+.act{width:28px;height:28px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all .15s;}
+.act:hover{background:var(--surface2);}
+.act svg{width:15px;height:15px;}
+.act.del:hover{background:var(--red-bg);color:var(--red);}
+.act.edit:hover{background:var(--blue-bg);color:var(--blue);}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.28);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s;}
+.overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border-radius:20px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);transform:scale(.96) translateY(10px);transition:transform .2s;}
+.overlay.open .modal{transform:scale(1) translateY(0);}
+.mhead{padding:22px 24px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:.5px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;}
+.mhead-title{font-family:var(--font-d);font-size:17px;font-weight:700;letter-spacing:-.3px;}
+.mclose{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:background .15s;}
+.mclose:hover{background:var(--border-med);}
+.mclose svg{width:14px;height:14px;}
+.mbody{padding:20px 24px;display:flex;flex-direction:column;gap:14px;}
+.mfoot{padding:0 24px 22px;display:flex;justify-content:flex-end;gap:10px;}
+
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:5px;}
+.fl{font-size:12.5px;font-weight:600;color:var(--text2);}
+.fi,.fs,.fta{width:100%;padding:9px 11px;border-radius:var(--radius);border:.5px solid var(--border-med);background:var(--surface);font-size:13.5px;font-family:var(--font);color:var(--text);outline:none;transition:.15s;}
+.fi:focus,.fs:focus,.fta:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,.1);}
+.fta{min-height:72px;resize:vertical;line-height:1.55;}
+.fs{appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236e6e73'%3E%3Cpath d='M8 10L3 5h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;padding-right:30px;}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* UPLOAD BOXES */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.upload-box{border-radius:var(--radius);overflow:hidden;}
+.upload-box-header{padding:8px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.upload-box-header svg{width:14px;height:14px;}
+.upload-box.img-box .upload-box-header{background:var(--navy-bg);color:var(--navy-text);}
+.upload-box.cert-box .upload-box-header{background:var(--navy-bg);color:var(--navy-text);}
+.upload-zone{border:1.5px dashed var(--border-med);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:14px;text-align:center;cursor:pointer;background:var(--surface2);transition:all .15s;position:relative;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:var(--blue-bg);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-zone svg{width:22px;height:22px;color:var(--text3);margin-bottom:4px;}
+.upload-zone p{font-size:12px;color:var(--text2);}
+.upload-zone small{font-size:11px;color:var(--text3);}
+.flist{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
+.fitem{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--surface);border-radius:7px;border:.5px solid var(--border);}
+.fitem svg{width:13px;height:13px;flex-shrink:0;}
+.fitem-name{flex:1;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fitem-size{font-size:10.5px;color:var(--text3);flex-shrink:0;}
+.fitem-rm{width:18px;height:18px;border-radius:50%;border:none;background:transparent;cursor:pointer;color:var(--text3);display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.fitem-rm:hover{background:var(--red-bg);color:var(--red);}
+.fitem-rm svg{width:10px;height:10px;}
+.prog-wrap{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden;display:none;}
+.prog-bar{height:100%;background:var(--blue);border-radius:2px;transition:width .2s;}
+
+/* EXCEL */
+.excel-box{border:1.5px dashed var(--border-med);border-radius:var(--radius);padding:12px;background:#fafafa;}
+.excel-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.excel-lbl{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;font-weight:500;}
+.excel-lbl svg{width:13px;height:13px;color:var(--green);}
+.excel-parse{padding:4px 10px;border-radius:6px;background:var(--surface);border:.5px solid var(--border-med);font-size:11.5px;font-weight:500;color:var(--blue);cursor:pointer;font-family:var(--font);}
+.excel-parse:hover{background:var(--blue-bg);}
+.excel-ta{width:100%;min-height:60px;border:none;background:transparent;font-size:12.5px;font-family:'SF Mono','Menlo',monospace;color:var(--text);resize:none;outline:none;line-height:1.6;}
+
+/* BTNS */
+.btn-s{height:34px;padding:0 16px;border-radius:var(--radius);background:var(--surface2);color:var(--text);border:.5px solid var(--border-med);font-size:13px;font-weight:500;font-family:var(--font);cursor:pointer;transition:background .15s;}
+.btn-s:hover{background:var(--gray-bg);}
+.btn-p{height:34px;padding:0 18px;border-radius:var(--radius);background:var(--blue);color:white;border:none;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;transition:background .15s;}
+.btn-p:hover{background:#0066dd;}
+.btn-p:disabled{background:var(--text3);cursor:default;}
+
+/* UPLOAD PROGRESS OVERLAY */
+.upload-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+.upload-overlay.open{opacity:1;pointer-events:all;}
+.upload-card{background:var(--surface);border-radius:20px;padding:28px 32px;width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+.upload-card-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
+.upload-card-title{font-size:15px;font-weight:700;margin-bottom:6px;}
+.upload-card-sub{font-size:13px;color:var(--text2);margin-bottom:16px;}
+.upload-prog-track{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+.upload-prog-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .3s;}
+
+/* TOAST */
+.toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:600;display:flex;flex-direction:column;gap:7px;pointer-events:none;}
+.toast{background:rgba(28,28,30,.9);color:white;padding:9px 18px;border-radius:20px;font-size:13px;font-weight:500;backdrop-filter:blur(12px);white-space:nowrap;animation:tin .22s ease,tout .22s ease 2.6s forwards;}
+.toast.err{background:rgba(255,59,48,.9);}
+.toast.ok{background:rgba(52,199,89,.9);}
+@keyframes tin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tout{from{opacity:1}to{opacity:0}}
+
+/* EMPTY / LOADING */
+.empty{text-align:center;padding:70px 20px;color:var(--text3);}
+.empty svg{width:44px;height:44px;margin-bottom:14px;}
+.empty p{font-size:15px;font-weight:500;color:var(--text2);}
+.empty small{font-size:13px;}
+.ld{text-align:center;padding:60px;color:var(--text2);font-size:14px;}
+.spin{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 12px;}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* PAGER */
+.pager{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:.5px solid var(--border);}
+.pager-info{font-size:12.5px;color:var(--text2);}
+.pager-btns{display:flex;gap:5px;}
+.pager-btn{height:28px;min-width:28px;padding:0 8px;border-radius:7px;border:.5px solid var(--border-med);background:var(--surface);font-size:12px;cursor:pointer;color:var(--text2);transition:all .15s;}
+.pager-btn:hover:not(:disabled){background:var(--surface2);}
+.pager-btn.active{background:var(--blue);color:white;border-color:transparent;}
+.pager-btn:disabled{opacity:.4;cursor:default;}
+
+/* NAV TABS */
+.nav-tabs{display:flex;gap:2px;padding:0 28px;background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid var(--border-med);}
+.nav-tab{padding:0 20px;height:42px;border:none;background:transparent;font-size:13.5px;font-weight:500;font-family:var(--font);color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;display:flex;align-items:center;gap:7px;}
+.nav-tab svg{width:15px;height:15px;}
+.nav-tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600;}
+.nav-tab:hover:not(.active){color:var(--text);}
+
+/* PAGE */
+.page{display:none;}.page.active{display:block;}
+
+/* DONE PAGE */
+.done-toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+.done-count-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:var(--green-bg);border-radius:20px;font-size:13px;font-weight:600;color:var(--green-text);}
+.done-count-badge svg{width:14px;height:14px;}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap;}
+.badge .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.badge.done{background:var(--green-bg);color:var(--green-text);}
+.badge.done .dot{background:var(--green);}
+
+@media(max-width:900px){
+  .stats{grid-template-columns:repeat(2,1fr);}
+  .frow,.upload-grid{grid-template-columns:1fr;}
+  table{font-size:12px;}
+  th,td{padding:7px 8px;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-title">ระบบแจ้งเตรียมงาน Lock Heat/Cert</span>
+  <div class="header-actions">
+    <button class="hbtn" onclick="loadData()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 8a5.5 5.5 0 015.5-5.5 5.5 5.5 0 013.89 1.61L13.5 2.5v4h-4l1.5-1.5A3.5 3.5 0 108 11.5a3.5 3.5 0 003.43-2.77l1.97.37A5.5 5.5 0 018 13.5 5.5 5.5 0 012.5 8z"/></svg>
+      รีเฟรช
+    </button>
+    <button class="hbtn" onclick="openExcelModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="12" rx="1.5"/><line x1="5.5" y1="2" x2="5.5" y2="14"/><line x1="2" y1="5.5" x2="14" y2="5.5"/><line x1="2" y1="9" x2="14" y2="9"/></svg>
+      วางจาก Excel
+    </button>
+    <button class="hbtn primary" onclick="openAddModal()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+      แจ้งเตรียมงานใหม่
+    </button>
+  </div>
+</div>
+
+<!-- NAV TABS -->
+<div class="nav-tabs">
+  <button class="nav-tab active" id="tabMain" onclick="switchPage('main')">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="12" rx="1.5"/><line x1="5" y1="6" x2="11" y2="6"/><line x1="5" y1="9" x2="9" y2="9"/></svg>
+    รายการทั้งหมด
+  </button>
+  <button class="nav-tab" id="tabDone" onclick="switchPage('done')">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8l4 4 8-8"/></svg>
+    เตรียมเสร็จแล้ว
+  </button>
+</div>
+
+<!-- PAGE: MAIN -->
+<div class="page active" id="pagMain">
+<div class="main">
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-icon" style="background:#f2f2f7"><svg viewBox="0 0 20 20" fill="none" stroke="#6e6e73" stroke-width="1.5"><rect x="3" y="3" width="14" height="14" rx="2"/><line x1="7" y1="8" x2="13" y2="8"/><line x1="7" y1="11" x2="11" y2="11"/></svg></div>
+      <div><div class="stat-num" id="cAll">—</div><div class="stat-lbl">ทั้งหมด</div></div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon" style="background:var(--orange-bg)"><svg viewBox="0 0 20 20" fill="none" stroke="var(--orange)" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2.5"/></svg></div>
+      <div><div class="stat-num" id="cPend">—</div><div class="stat-lbl">รอดำเนินการ</div></div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon" style="background:var(--blue-bg)"><svg viewBox="0 0 20 20" fill="none" stroke="var(--blue)" stroke-width="1.5"><path d="M4 10a6 6 0 016-6 6 6 0 014.24 1.76L16 4v5h-5l1.76-1.76A4 4 0 0010 6a4 4 0 000 8 4 4 0 003.93-3.3l1.96.38A6 6 0 0110 16a6 6 0 01-6-6z"/></svg></div>
+      <div><div class="stat-num" id="cProg">—</div><div class="stat-lbl">กำลังเตรียม</div></div>
+    </div>
+    <div class="stat">
+      <div class="stat-icon" style="background:var(--green-bg)"><svg viewBox="0 0 20 20" fill="none" stroke="var(--green)" stroke-width="1.8"><path d="M4 10l4 4 8-8"/></svg></div>
+      <div><div class="stat-num" id="cDone">—</div><div class="stat-lbl">เตรียมเสร็จ</div></div>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+      <input class="search-in" id="searchIn" placeholder="ค้นหา S.O, ลูกค้า, รหัสสินค้า, Batch, Heat..." oninput="renderTable()"/>
+    </div>
+    <select class="status-sel" id="statusFilter" onchange="renderTable()">
+      <option value="">สถานะทั้งหมด</option>
+      <option value="pending">รอดำเนินการ</option>
+      <option value="inprogress">อยู่ระหว่างดำเนินการ</option>
+      <option value="done">เตรียมเสร็จแล้ว</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <div id="tableArea"><div class="ld"><div class="spin"></div>กำลังโหลด...</div></div>
+  </div>
+</div>
+</div><!-- end pagMain -->
+
+<!-- PAGE: DONE -->
+<div class="page" id="pagDone">
+<div class="main">
+  <div class="done-toolbar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+      <input class="search-in" id="doneSearchIn" placeholder="ค้นหา S.O, ลูกค้า, รหัส, Batch, Heat..." oninput="renderDoneTable()"/>
+    </div>
+    <div class="done-count-badge">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8l4 4 8-8"/></svg>
+      เตรียมเสร็จแล้ว <span id="doneCount">—</span> รายการ
+    </div>
+  </div>
+  <div class="table-wrap">
+    <div id="doneTableArea"><div class="ld"><div class="spin"></div>กำลังโหลด...</div></div>
+  </div>
+</div>
+</div><!-- end pagDone -->
+
+<!-- TOAST -->
+<div class="toasts" id="toasts"></div>
+
+<!-- UPLOAD PROGRESS OVERLAY -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-card">
+    <div class="upload-card-icon" id="uploadIcon" style="background:var(--blue-bg)">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </div>
+    <div class="upload-card-title" id="uploadTitle">กำลังอัพโหลด...</div>
+    <div class="upload-card-sub" id="uploadSub">โปรดรอสักครู่</div>
+    <div class="upload-prog-track"><div class="upload-prog-fill" id="uploadProg" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- ── ADD/EDIT MODAL ── -->
+<div class="overlay" id="formOverlay">
+  <div class="modal">
+    <div class="mhead">
+      <span class="mhead-title" id="formTitle">แจ้งเตรียมงานใหม่</span>
+      <button class="mclose" onclick="closeModal('formOverlay')"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg></button>
+    </div>
+    <div class="mbody">
+      <input type="hidden" id="fId"/>
+      <div class="frow">
+        <div class="fg"><label class="fl">S.O No. *</label><input class="fi" id="fSO" placeholder="1300000000"/></div>
+        <div class="fg"><label class="fl">ลูกค้า *</label><input class="fi" id="fCust" placeholder="บจก. / ชื่อลูกค้า"/></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="fl">รหัสสินค้า *</label><input class="fi" id="fCode" placeholder="1AK106-050-00226"/></div>
+        <div class="fg"><label class="fl">Qty</label><input class="fi" id="fQty" type="number" placeholder="0"/></div>
+      </div>
+      <div class="fg"><label class="fl">รายการสินค้า</label><input class="fi" id="fItem" placeholder="เหล็กฉากSS400 50x50x5.00mm x 6.0M"/></div>
+      <div class="frow">
+        <div class="fg"><label class="fl">Batch</label><input class="fi" id="fBatch" placeholder="AKTSL"/></div>
+        <div class="fg"><label class="fl">Heat</label><input class="fi" id="fHeat" placeholder="H52879"/></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label class="fl">วันที่แจ้ง</label><input class="fi" id="fDate" type="date"/></div>
+        <div class="fg"><label class="fl">ผู้แจ้ง</label><input class="fi" id="fUser" placeholder="ชาติ 2306"/></div>
+      </div>
+      <div class="fg"><label class="fl">สถานะ</label>
+        <select class="fs" id="fStatus">
+          <option value="pending">รอดำเนินการ</option>
+          <option value="inprogress">อยู่ระหว่างดำเนินการ</option>
+          <option value="done">เตรียมเสร็จแล้ว</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">หมายเหตุ</label><textarea class="fta" id="fNote" placeholder="หมายเหตุเพิ่มเติม..."></textarea></div>
+
+      <!-- UPLOAD 2 ช่อง -->
+      <div class="fg"><label class="fl">อัพโหลดไฟล์</label>
+        <div class="upload-grid">
+          <!-- รูปสินค้า -->
+          <div class="upload-box img-box">
+            <div class="upload-box-header">
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="12" height="12" rx="1"/><circle cx="4.5" cy="4.5" r="1"/><path d="M1 9l3.5-3.5L7 8l2-2 4 4"/></svg>
+              รูปสินค้า
+            </div>
+            <div class="upload-zone" id="imgZone"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleDrop(event,'img')">
+              <input type="file" id="imgInput" multiple accept="image/*" onchange="handleFiles(this.files,'img')"/>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              <p>คลิกหรือลากรูปภาพ</p>
+              <small>JPG, PNG, WEBP</small>
+            </div>
+            <div class="flist" id="imgList"></div>
+          </div>
+          <!-- ใบเซอร์ -->
+          <div class="upload-box cert-box">
+            <div class="upload-box-header">
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1h7l3 3v9H2V1z"/><line x1="4.5" y1="5.5" x2="9.5" y2="5.5"/><line x1="4.5" y1="7.5" x2="8" y2="7.5"/><line x1="4.5" y1="9.5" x2="7" y2="9.5"/></svg>
+              ใบเซอร์ / เอกสาร
+            </div>
+            <div class="upload-zone" id="certZone"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleDrop(event,'cert')">
+              <input type="file" id="certInput" multiple accept=".pdf,.xlsx,.xls,.doc,.docx,.jpg,.png" onchange="handleFiles(this.files,'cert')"/>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <p>คลิกหรือลากไฟล์</p>
+              <small>PDF, Excel, Word</small>
+            </div>
+            <div class="flist" id="certList"></div>
+          </div>
+        </div>
+        <div class="prog-wrap" id="progWrap"><div class="prog-bar" id="progBar" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-s" onclick="closeModal('formOverlay')">ยกเลิก</button>
+      <button class="btn-p" id="saveBtn" onclick="saveRecord()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EXCEL MODAL ── -->
+<div class="overlay" id="excelOverlay">
+  <div class="modal" style="max-width:540px">
+    <div class="mhead">
+      <span class="mhead-title">วางข้อมูลจาก Excel</span>
+      <button class="mclose" onclick="closeModal('excelOverlay')"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg></button>
+    </div>
+    <div class="mbody">
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;padding:10px;background:var(--surface2);border-radius:var(--radius);">
+        <strong>วิธีใช้:</strong> เลือก rows ใน Excel แล้ว Copy (Ctrl+C) จากนั้นวาง (Ctrl+V) ในช่องด้านล่าง<br/>
+        <span style="color:var(--text3);font-size:12px;">คอลัมน์: S.O No. | ลูกค้า | รหัส | รายการสินค้า | Qty | Batch | Heat | วันที่แจ้ง | ผู้แจ้ง</span>
+      </div>
+      <div class="excel-box">
+        <div class="excel-top">
+          <div class="excel-lbl">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="12" height="12" rx="1"/><line x1="4.5" y1="1" x2="4.5" y2="13"/><line x1="1" y1="4.5" x2="13" y2="4.5"/><line x1="1" y1="8" x2="13" y2="8"/></svg>
+            วางข้อมูล Excel
+          </div>
+          <button class="excel-parse" onclick="previewExcel()">ดูตัวอย่าง & นำเข้า</button>
+        </div>
+        <textarea class="excel-ta" id="excelTA" rows="8" placeholder="วางข้อมูลที่นี่..."></textarea>
+      </div>
+      <div id="excelPreview"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-s" onclick="closeModal('excelOverlay')">ปิด</button>
+      <button class="btn-p" id="excelSaveBtn" onclick="importExcel()" style="display:none">นำเข้า <span id="excelCount"></span> รายการ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW DETAIL MODAL ── -->
+<div class="overlay" id="viewOverlay">
+  <div class="modal" style="max-width:600px">
+    <div class="mhead">
+      <span class="mhead-title">รายละเอียดงาน</span>
+      <button class="mclose" onclick="closeModal('viewOverlay')"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/></svg></button>
+    </div>
+    <div class="mbody" id="viewBody"></div>
+    <div class="mfoot"><button class="btn-s" onclick="closeModal('viewOverlay')">ปิด</button></div>
+  </div>
+</div>
+
+<script>
+const SB_URL = 'https://nvdvivlkucuvdfhvhwni.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52ZHZpdmxrdWN1dmRmaHZod25pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NDkzNTUsImV4cCI6MjA5NDIyNTM1NX0.y_BH6a_ZC-ViOSffmmrSbILlqRpNpF_A3W-eniZuCaA';
+const TABLE  = 'tasks';
+const BUCKET = 'attachments';
+
+let sb = null, records = [], editId = null, PAGE = 1;
+const PER = 20;
+let pendingImg  = []; // รูปสินค้า
+let pendingCert = []; // ใบเซอร์
+let excelParsed = [];
+
+/* ── INIT ── */
+(function(){
+  sb = supabase.createClient(SB_URL, SB_KEY);
+  loadData();
+})();
+
+/* ── LOAD ── */
+async function loadData(){
+  document.getElementById('tableArea').innerHTML='<div class="ld"><div class="spin"></div>กำลังโหลด...</div>';
+  try{
+    const {data,error}=await sb.from(TABLE).select('*').order('created_at',{ascending:false});
+    if(error) throw error;
+    records=data||[];
+    updateStats(); renderTable();
+    if(records.length) toast('โหลด '+records.length+' รายการ ✓','ok');
+  }catch(e){ showErr('โหลดข้อมูลไม่สำเร็จ',e.message); }
+}
+
+function showErr(title,msg){
+  document.getElementById('tableArea').innerHTML=`
+    <div style="text-align:center;padding:60px 30px">
+      <div style="width:48px;height:48px;background:var(--red-bg);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".8" fill="var(--red)"/></svg>
+      </div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px">${title}</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;max-width:400px;margin:0 auto">${msg}</div>
+      <button onclick="loadData()" style="margin-top:18px;padding:9px 22px;border-radius:10px;background:var(--blue);color:white;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">ลองใหม่</button>
+    </div>`;
+}
+
+/* ── SWITCH PAGE ── */
+function switchPage(page){
+  document.getElementById('pagMain').classList.toggle('active', page==='main');
+  document.getElementById('pagDone').classList.toggle('active', page==='done');
+  document.getElementById('tabMain').classList.toggle('active', page==='main');
+  document.getElementById('tabDone').classList.toggle('active', page==='done');
+  if(page==='done') renderDoneTable();
+}
+
+/* ── DONE TABLE ── */
+function renderDoneTable(){
+  const q = document.getElementById('doneSearchIn').value.toLowerCase();
+  const rows = records.filter(r=>{
+    const isDone = r.status==='done';
+    const mq = !q || [r.so_no,r.customer,r.product_code,r.product_name,r.batch,r.heat,r.notifier].some(v=>(v||'').toLowerCase().includes(q));
+    return isDone && mq;
+  });
+
+  document.getElementById('doneCount').textContent = rows.length;
+
+  if(!rows.length){
+    document.getElementById('doneTableArea').innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p>ยังไม่มีรายการที่เตรียมเสร็จ</p><small>รายการที่เปลี่ยนสถานะเป็น "เตรียมเสร็จแล้ว" จะแสดงที่นี่</small></div>`;
+    return;
+  }
+
+  const tbody = rows.map((r,i)=>{
+    const imgs  = r.product_images||[];
+    const certs = r.cert_files||[];
+
+    const imgCell = imgs.length
+      ? imgs.map(f=>`<a class="file-btn img-btn" href="${f.url}" download="${f.name}" title="${f.name}"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 1v7M3.5 5.5l2.5 2.5 2.5-2.5"/><path d="M1 10h10"/></svg><span>${f.name}</span></a>`).join('')
+      : `<span style="font-size:12px;color:var(--text3)">—</span>`;
+
+    const certCell = certs.length
+      ? certs.map(f=>`<a class="file-btn cert-btn" href="${f.url}" download="${f.name}" title="${f.name}"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 1v7M3.5 5.5l2.5 2.5 2.5-2.5"/><path d="M1 10h10"/></svg><span>${f.name}</span></a>`).join('')
+      : `<span style="font-size:12px;color:var(--text3)">—</span>`;
+
+    return `<tr>
+      <td style="font-weight:700;color:var(--blue);font-size:12.5px">${r.so_no||'—'}</td>
+      <td style="font-size:12.5px">${r.customer||'—'}</td>
+      <td style="font-size:12px;font-family:monospace;color:var(--text2)">${r.product_code||'—'}</td>
+      <td class="wrap" style="font-size:12.5px;min-width:170px">${r.product_name||'—'}</td>
+      <td style="text-align:right;font-weight:500">${r.qty||'—'}</td>
+      <td style="font-size:12px;font-family:monospace">${r.batch||'—'}</td>
+      <td style="font-size:12px;font-family:monospace;color:var(--blue);font-weight:600">${r.heat||'—'}</td>
+      <td><div class="file-cell">${imgCell}</div></td>
+      <td><div class="file-cell">${certCell}</div></td>
+      <td>
+        <span class="badge done"><span class="dot"></span>เตรียมเสร็จแล้ว</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('doneTableArea').innerHTML=`
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>S.O No.</th>
+        <th>ลูกค้า</th>
+        <th>รหัส</th>
+        <th>รายการสินค้า</th>
+        <th style="text-align:right">Qty</th>
+        <th>Batch</th>
+        <th>Heat</th>
+        <th style="min-width:110px">📷 รูปสินค้า</th>
+        <th style="min-width:110px">📄 ใบเซอร์</th>
+        <th>สถานะ</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+    </div>`;
+}
+
+/* ── STATS ── */
+function updateStats(){
+  document.getElementById('cAll').textContent  = records.length;
+  document.getElementById('cPend').textContent = records.filter(r=>r.status==='pending').length;
+  document.getElementById('cProg').textContent = records.filter(r=>r.status==='inprogress').length;
+  document.getElementById('cDone').textContent = records.filter(r=>r.status==='done').length;
+}
+
+/* ── RENDER TABLE ── */
+function renderTable(){
+  const q  = document.getElementById('searchIn').value.toLowerCase();
+  const sf = document.getElementById('statusFilter').value;
+  let rows = records.filter(r=>{
+    const mq = !q || [r.so_no,r.customer,r.product_code,r.product_name,r.batch,r.heat,r.notifier].some(v=>(v||'').toLowerCase().includes(q));
+    return mq && (!sf || r.status===sf);
+  });
+  updateStats();
+  const total=rows.length, pages=Math.max(1,Math.ceil(total/PER));
+  if(PAGE>pages) PAGE=1;
+  const pageRows=rows.slice((PAGE-1)*PER,PAGE*PER);
+
+  if(!total){
+    document.getElementById('tableArea').innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg><p>ไม่พบข้อมูล</p><small>ลองเปลี่ยนคำค้นหาหรือตัวกรอง</small></div>`;
+    return;
+  }
+
+  const tbody = pageRows.map(r=>{
+    const imgs  = (r.product_images||[]);
+    const certs = (r.cert_files||[]);
+
+    // รูปสินค้า cell — ปุ่ม download
+    let imgCell = '';
+    if(imgs.length){
+      imgCell = imgs.map(f=>`
+        <a class="file-btn img-btn" href="${f.url}" download="${f.name}" title="ดาวน์โหลด: ${f.name}">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 1v7M3.5 5.5l2.5 2.5 2.5-2.5"/><path d="M1 10h10"/></svg>
+          <span>${f.name}</span>
+        </a>`).join('');
+    } else {
+      imgCell = `<span style="font-size:12px;color:var(--text3)">—</span>`;
+    }
+
+    // ใบเซอร์ cell — ปุ่ม download
+    let certCell = '';
+    if(certs.length){
+      certCell = certs.map(f=>`
+        <a class="file-btn cert-btn" href="${f.url}" download="${f.name}" title="ดาวน์โหลด: ${f.name}">
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 1v7M3.5 5.5l2.5 2.5 2.5-2.5"/><path d="M1 10h10"/></svg>
+          <span>${f.name}</span>
+        </a>`).join('');
+    } else {
+      certCell = `<span style="font-size:12px;color:var(--text3)">—</span>`;
+    }
+
+    return `<tr>
+      <td style="font-weight:700;color:var(--blue);font-size:12.5px">${r.so_no||'—'}</td>
+      <td style="font-size:12.5px">${r.customer||'—'}</td>
+      <td style="font-size:12px;font-family:monospace;color:var(--text2)">${r.product_code||'—'}</td>
+      <td class="wrap" style="font-size:12.5px;min-width:170px">${r.product_name||'—'}</td>
+      <td style="text-align:right;font-weight:500">${r.qty||'—'}</td>
+      <td style="font-size:12px;font-family:monospace">${r.batch||'—'}</td>
+      <td style="font-size:12px;font-family:monospace;color:var(--blue)">${r.heat||'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${fmtDate(r.notify_date)}</td>
+      <td style="font-size:12px">${r.notifier||'—'}</td>
+      <td><div class="file-cell">${imgCell}</div></td>
+      <td><div class="file-cell">${certCell}</div></td>
+      <td>
+        <select class="status-inline ${r.status||'pending'}" onchange="quickStatus('${r.id}',this.value,this)">
+          <option value="pending" ${r.status==='pending'?'selected':''}>รอดำเนินการ</option>
+          <option value="inprogress" ${r.status==='inprogress'?'selected':''}>อยู่ระหว่างดำเนินการ</option>
+          <option value="done" ${r.status==='done'?'selected':''}>เตรียมเสร็จแล้ว</option>
+        </select>
+      </td>
+      <td>
+        <div class="act-wrap">
+          <button class="act edit" title="แก้ไข" onclick="editRecord('${r.id}')"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10.5 2.5l2 2-9 9H1.5v-2l9-9z"/></svg></button>
+          <button class="act del" title="ลบ" onclick="deleteRecord('${r.id}')"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h11M5 4V2h5v2M6 7v5M9 7v5M3 4l1 9h7l1-9"/></svg></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  let pager='';
+  if(pages>1){
+    let btns=`<button class="pager-btn" onclick="goPage(${PAGE-1})" ${PAGE===1?'disabled':''}>‹</button>`;
+    for(let i=1;i<=pages;i++){
+      if(i===1||i===pages||Math.abs(i-PAGE)<=1) btns+=`<button class="pager-btn ${i===PAGE?'active':''}" onclick="goPage(${i})">${i}</button>`;
+      else if(Math.abs(i-PAGE)===2) btns+='<button class="pager-btn" disabled>…</button>';
+    }
+    btns+=`<button class="pager-btn" onclick="goPage(${PAGE+1})" ${PAGE===pages?'disabled':''}>›</button>`;
+    pager=`<div class="pager"><div class="pager-info">แสดง ${(PAGE-1)*PER+1}–${Math.min(PAGE*PER,total)} จาก ${total} รายการ</div><div class="pager-btns">${btns}</div></div>`;
+  }
+
+  document.getElementById('tableArea').innerHTML=`
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>S.O No.</th><th>ลูกค้า</th><th>รหัส</th><th>รายการสินค้า</th>
+        <th style="text-align:right">Qty</th><th>Batch</th><th>Heat</th>
+        <th>วันที่แจ้ง</th><th>ผู้แจ้ง</th>
+        <th style="min-width:110px">📷 รูปสินค้า</th>
+        <th style="min-width:110px">📄 ใบเซอร์</th>
+        <th>สถานะ</th><th>จัดการ</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>
+    </div>${pager}`;
+}
+
+function goPage(p){PAGE=p;renderTable();}
+function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){return d;}}
+
+/* ── QUICK STATUS ── */
+async function quickStatus(id,val,el){
+  el.className='status-inline '+val;
+  const r=records.find(x=>x.id===id); if(r) r.status=val;
+  updateStats();
+  try{ await sb.from(TABLE).update({status:val}).eq('id',id); toast('อัพเดตสถานะแล้ว','ok'); }
+  catch(e){ toast('อัพเดตล้มเหลว','err'); }
+}
+
+/* ── QUICK UPLOAD (from table row) ── */
+let quickUploadId=null, quickUploadType=null;
+function quickUpload(id,type){
+  quickUploadId=id; quickUploadType=type;
+  const inp=document.createElement('input');
+  inp.type='file'; inp.multiple=true;
+  inp.accept = type==='img' ? 'image/*' : '.pdf,.xlsx,.xls,.doc,.docx,.jpg,.png';
+  inp.onchange=async function(){
+    if(!inp.files.length) return;
+    const r=records.find(x=>x.id===id); if(!r) return;
+    await doUpload(id, Array.from(inp.files), type, r);
+  };
+  inp.click();
+}
+
+async function doUpload(recordId, files, type, record){
+  const field  = type==='img' ? 'product_images' : 'cert_files';
+  const folder = type==='img' ? 'images' : 'certs';
+  const existing = (record[field]||[]);
+  const newMeta  = [...existing];
+
+  showUploadOverlay(true, files.length);
+  let done=0;
+  for(const f of files){
+    const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g,'_').replace(/__+/g,'_');
+    const path = `${recordId}/${folder}/${Date.now()}_${safeName}`;
+    try{
+      const {error}=await sb.storage.from(BUCKET).upload(path,f,{upsert:true,contentType:f.type||'application/octet-stream'});
+      if(error){ alert('อัพโหลดไม่สำเร็จ: '+f.name+'\n'+error.message); }
+      else{
+        const {data:ud}=sb.storage.from(BUCKET).getPublicUrl(path);
+        newMeta.push({name:f.name,path,url:ud.publicUrl,size:f.size,type:f.type.startsWith('image/')?'image':'file'});
+      }
+    }catch(ex){ alert('Error: '+ex.message); }
+    done++;
+    setUploadProg(Math.round(done/files.length*100));
+  }
+  showUploadOverlay(false);
+
+  // save to DB
+  const {error}=await sb.from(TABLE).update({[field]:newMeta}).eq('id',recordId);
+  if(error){ toast('บันทึกไฟล์ไม่สำเร็จ','err'); return; }
+  const idx=records.findIndex(r=>r.id===recordId);
+  if(idx>=0) records[idx][field]=newMeta;
+  renderTable();
+  toast('อัพโหลดสำเร็จ '+files.length+' ไฟล์ ✓','ok');
+}
+
+function showUploadOverlay(open,count){
+  const el=document.getElementById('uploadOverlay');
+  if(open){
+    document.getElementById('uploadTitle').textContent='กำลังอัพโหลด '+(count||'')+'  ไฟล์...';
+    document.getElementById('uploadSub').textContent='โปรดรอสักครู่';
+    setUploadProg(0);
+    el.classList.add('open');
+  } else {
+    el.classList.remove('open');
+  }
+}
+function setUploadProg(pct){document.getElementById('uploadProg').style.width=pct+'%';}
+
+/* ── MODAL FORM ── */
+function openAddModal(){
+  editId=null; pendingImg=[]; pendingCert=[];
+  document.getElementById('formTitle').textContent='แจ้งเตรียมงานใหม่';
+  ['fId','fSO','fCust','fCode','fItem','fBatch','fHeat','fUser','fNote'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fQty').value='';
+  document.getElementById('fDate').value=new Date().toISOString().slice(0,10);
+  document.getElementById('fStatus').value='pending';
+  document.getElementById('imgList').innerHTML='';
+  document.getElementById('certList').innerHTML='';
+  document.getElementById('imgPreview').innerHTML='';
+  openModal('formOverlay');
+}
+
+function editRecord(id){
+  const r=records.find(x=>x.id===id); if(!r) return;
+  editId=id; pendingImg=[]; pendingCert=[];
+  document.getElementById('formTitle').textContent='แก้ไขงาน';
+  document.getElementById('fId').value=id;
+  document.getElementById('fSO').value=r.so_no||'';
+  document.getElementById('fCust').value=r.customer||'';
+  document.getElementById('fCode').value=r.product_code||'';
+  document.getElementById('fItem').value=r.product_name||'';
+  document.getElementById('fQty').value=r.qty||'';
+  document.getElementById('fBatch').value=r.batch||'';
+  document.getElementById('fHeat').value=r.heat||'';
+  document.getElementById('fDate').value=r.notify_date||'';
+  document.getElementById('fUser').value=r.notifier||'';
+  document.getElementById('fStatus').value=r.status||'pending';
+  document.getElementById('fNote').value=r.note||'';
+  // แสดงไฟล์ที่มีอยู่แล้ว
+  renderExistingFiles(r.product_images||[], 'imgList', '', 'img');
+  renderExistingFiles(r.cert_files||[], 'certList', '', 'cert');
+  openModal('formOverlay');
+}
+
+function renderExistingFiles(files, listId, previewId, type){
+  document.getElementById(listId).innerHTML = files.map((f,i)=>`
+    <div class="fitem">
+      ${f.type==='image'
+        ?'<svg viewBox="0 0 15 15" fill="none" stroke="var(--purple)" stroke-width="1.5"><rect x="1" y="1" width="13" height="13" rx="1"/><circle cx="4.5" cy="4.5" r="1.5"/><path d="M1 10l4-4 3 3 2-2.5 4 4"/></svg>'
+        :'<svg viewBox="0 0 15 15" fill="none" stroke="var(--green)" stroke-width="1.5"><path d="M3 1h7l3 3v10H3V1z"/></svg>'}
+      <a class="fitem-name" href="${f.url}" download="${f.name}" title="ดาวน์โหลด">${f.name}</a>
+      <span class="fitem-size">${f.size?fmtSize(f.size):''}</span>
+      <a href="${f.url}" download="${f.name}" title="ดาวน์โหลด" style="color:var(--blue);display:flex;align-items:center;">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" width="14" height="14"><path d="M7 1v8M4.5 6.5L7 9l2.5-2.5"/><path d="M1 12h12"/></svg>
+      </a>
+      <button class="fitem-rm" onclick="deleteExistingFile('${type}',${i})" title="ลบไฟล์">
+        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/></svg>
+      </button>
+    </div>`).join('');
+}
+
+// ลบไฟล์ที่มีอยู่ใน edit modal
+async function deleteExistingFile(type, idx){
+  if(!confirm('ลบไฟล์นี้?')) return;
+  const r = records.find(x=>x.id===editId); if(!r) return;
+  const field = type==='img' ? 'product_images' : 'cert_files';
+  const files = [...(r[field]||[])];
+  const target = files[idx];
+
+  // ลบจาก Storage
+  if(target?.path){
+    await sb.storage.from(BUCKET).remove([target.path]).catch(e=>console.warn('storage remove:',e));
+  }
+
+  files.splice(idx,1);
+  // อัพเดต DB
+  const {error} = await sb.from(TABLE).update({[field]:files}).eq('id',editId);
+  if(error){ toast('ลบไฟล์ไม่สำเร็จ','err'); return; }
+
+  // อัพเดต local
+  r[field] = files;
+  const previewId = type==='img' ? 'imgPreview' : '';
+  renderExistingFiles(files, type==='img'?'imgList':'certList', previewId, type);
+  renderTable();
+  toast('ลบไฟล์แล้ว ✓','ok');
+}
+
+/* ── FILE HANDLING ── */
+function handleFiles(files, type){
+  const arr = type==='img' ? pendingImg : pendingCert;
+  [...files].forEach(f=>arr.push(f));
+  renderPendingList(type);
+}
+function handleDrop(ev,type){
+  ev.preventDefault();
+  document.getElementById(type==='img'?'imgZone':'certZone').classList.remove('drag');
+  handleFiles(ev.dataTransfer.files,type);
+}
+function renderPendingList(type){
+  const arr  = type==='img' ? pendingImg : pendingCert;
+  const listId = type==='img' ? 'imgList' : 'certList';
+  const prevId = type==='img' ? 'imgPreview' : '';
+
+  document.getElementById(listId).innerHTML = arr.map((f,i)=>`
+    <div class="fitem">
+      ${f.type.startsWith('image/')
+        ?'<svg viewBox="0 0 15 15" fill="none" stroke="var(--purple)" stroke-width="1.5"><rect x="1" y="1" width="13" height="13" rx="1"/><circle cx="4.5" cy="4.5" r="1.5"/><path d="M1 10l4-4 3 3 2-2.5 4 4"/></svg>'
+        :'<svg viewBox="0 0 15 15" fill="none" stroke="var(--green)" stroke-width="1.5"><path d="M3 1h7l3 3v10H3V1z"/></svg>'}
+      <span class="fitem-name">${f.name}</span>
+      <span class="fitem-size">${fmtSize(f.size)}</span>
+      <button class="fitem-rm" onclick="removePending('${type}',${i})"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/></svg></button>
+    </div>`).join('');
+
+  if(prevId && type==='img'){
+    // ไม่แสดง preview รูปภาพ
+  }
+}
+function removePending(type,i){
+  if(type==='img') pendingImg.splice(i,1); else pendingCert.splice(i,1);
+  renderPendingList(type);
+}
+function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
+
+/* ── SAVE RECORD ── */
+async function saveRecord(){
+  const so=document.getElementById('fSO').value.trim();
+  const cust=document.getElementById('fCust').value.trim();
+  const code=document.getElementById('fCode').value.trim();
+  if(!so||!cust||!code){toast('กรุณาใส่ S.O No., ลูกค้า และรหัสสินค้า','err');return;}
+
+  const btn=document.getElementById('saveBtn');
+  btn.disabled=true; btn.textContent='กำลังบันทึก...';
+
+  try{
+    // ── ดึง files เดิม
+    const existing = editId ? records.find(r=>r.id===editId)||{} : {};
+    let imgMeta  = [...(existing.product_images||[])];
+    let certMeta = [...(existing.cert_files||[])];
+
+    // ── build payload
+    const payload={
+      so_no:        document.getElementById('fSO').value.trim(),
+      customer:     document.getElementById('fCust').value.trim(),
+      product_code: document.getElementById('fCode').value.trim(),
+      product_name: document.getElementById('fItem').value.trim(),
+      qty:          parseFloat(document.getElementById('fQty').value)||null,
+      batch:        document.getElementById('fBatch').value.trim(),
+      heat:         document.getElementById('fHeat').value.trim(),
+      notify_date:  document.getElementById('fDate').value||null,
+      notifier:     document.getElementById('fUser').value.trim(),
+      status:       document.getElementById('fStatus').value,
+      note:         document.getElementById('fNote').value.trim(),
+      product_images: imgMeta,
+      cert_files:     certMeta
+    };
+
+    // ── INSERT / UPDATE
+    let savedId=editId;
+    if(editId){
+      const {error}=await sb.from(TABLE).update(payload).eq('id',editId);
+      if(error){alert('บันทึกไม่สำเร็จ\nCode: '+error.code+'\n'+error.message);throw error;}
+      const idx=records.findIndex(r=>r.id===editId);
+      if(idx>=0) records[idx]={...records[idx],...payload};
+    } else {
+      const {data,error}=await sb.from(TABLE).insert(payload).select().single();
+      if(error){alert('บันทึกไม่สำเร็จ\nCode: '+error.code+'\n'+error.message);throw error;}
+      savedId=data.id;
+      records.unshift(data);
+    }
+
+    toast(editId?'แก้ไขข้อมูลสำเร็จ ✓':'เพิ่มข้อมูลสำเร็จ ✓','ok');
+    closeModal('formOverlay');
+    updateStats(); renderTable();
+
+    // ── UPLOAD files หลัง modal ปิด
+    const hasNew = pendingImg.length+pendingCert.length > 0;
+    if(hasNew && savedId){
+      const total=pendingImg.length+pendingCert.length;
+      showUploadOverlay(true,total);
+      let done=0;
+
+      // รูปสินค้า
+      for(const f of pendingImg){
+        const safeName=f.name.replace(/[^a-zA-Z0-9._-]/g,'_').replace(/__+/g,'_');
+        const path=`${savedId}/images/${Date.now()}_${safeName}`;
+        try{
+          const {error}=await sb.storage.from(BUCKET).upload(path,f,{upsert:true,contentType:f.type||'image/jpeg'});
+          if(error) alert('อัพโหลดรูปไม่สำเร็จ: '+f.name+'\n'+error.message);
+          else{
+            const {data:ud}=sb.storage.from(BUCKET).getPublicUrl(path);
+            imgMeta.push({name:f.name,path,url:ud.publicUrl,size:f.size,type:'image'});
+          }
+        }catch(ex){alert('Error: '+ex.message);}
+        done++; setUploadProg(Math.round(done/total*100));
+      }
+
+      // ใบเซอร์
+      for(const f of pendingCert){
+        const safeName=f.name.replace(/[^a-zA-Z0-9._-]/g,'_').replace(/__+/g,'_');
+        const path=`${savedId}/certs/${Date.now()}_${safeName}`;
+        try{
+          const {error}=await sb.storage.from(BUCKET).upload(path,f,{upsert:true,contentType:f.type||'application/pdf'});
+          if(error) alert('อัพโหลดเซอร์ไม่สำเร็จ: '+f.name+'\n'+error.message);
+          else{
+            const {data:ud}=sb.storage.from(BUCKET).getPublicUrl(path);
+            certMeta.push({name:f.name,path,url:ud.publicUrl,size:f.size,type:'file'});
+          }
+        }catch(ex){alert('Error: '+ex.message);}
+        done++; setUploadProg(Math.round(done/total*100));
+      }
+
+      // อัพเดต DB
+      await sb.from(TABLE).update({product_images:imgMeta,cert_files:certMeta}).eq('id',savedId);
+      const idx=records.findIndex(r=>r.id===savedId);
+      if(idx>=0){records[idx].product_images=imgMeta;records[idx].cert_files=certMeta;}
+      showUploadOverlay(false);
+      renderTable();
+      toast('อัพโหลดไฟล์สำเร็จ ✓','ok');
+    }
+
+  }catch(e){
+    console.error(e);
+  }finally{
+    btn.disabled=false; btn.textContent='บันทึก';
+    pendingImg=[]; pendingCert=[];
+  }
+}
+
+/* ── DELETE ── */
+async function deleteRecord(id){
+  if(!confirm('ลบรายการนี้?')) return;
+  try{
+    await sb.from(TABLE).delete().eq('id',id);
+    records=records.filter(r=>r.id!==id);
+    updateStats(); renderTable();
+    toast('ลบข้อมูลแล้ว','ok');
+  }catch(e){toast('ลบไม่สำเร็จ','err');}
+}
+
+/* ── สร้างรูป PNG จาก Canvas ── */
+function roundRect(ctx, x, y, w, h, r){
+  if(typeof r === 'number') r = [r,r,r,r];
+  ctx.beginPath();
+  ctx.moveTo(x+r[0], y);
+  ctx.lineTo(x+w-r[1], y); ctx.arcTo(x+w, y, x+w, y+r[1], r[1]);
+  ctx.lineTo(x+w, y+h-r[2]); ctx.arcTo(x+w, y+h, x+w-r[2], y+h, r[2]);
+  ctx.lineTo(x+r[3], y+h); ctx.arcTo(x, y+h, x, y+h-r[3], r[3]);
+  ctx.lineTo(x, y+r[0]); ctx.arcTo(x, y, x+r[0], y, r[0]);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxW, lineH){
+  const words = text.split(' ');
+  let line = '';
+  let lines = [];
+  for(let w of words){
+    const test = line ? line+' '+w : w;
+    if(ctx.measureText(test).width > maxW && line){
+      lines.push(line); line = w;
+    } else { line = test; }
+  }
+  if(line) lines.push(line);
+  lines.forEach((l,i) => ctx.fillText(l, x, y + i*lineH));
+  return lines.length;
+}
+
+async function generateTaskImage(rows){
+  const today = new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const W = 1000;
+  const PAD = 28, HEADER_H = 110, FOOTER_H = 70;
+  const ROW_H = 130; // สูงขึ้นรองรับ wrap
+
+  const H = HEADER_H + rows.length * ROW_H + FOOTER_H + PAD;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // ── พื้นหลัง
+  ctx.fillStyle = '#F2F2F7';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Header gradient
+  const grad = ctx.createLinearGradient(0,0,W,HEADER_H);
+  grad.addColorStop(0,'#1C1C1E'); grad.addColorStop(1,'#3A3A3C');
+  ctx.fillStyle = grad;
+  roundRect(ctx,0,0,W,HEADER_H,[0,0,0,0]); ctx.fill();
+
+  // icon circle
+  ctx.fillStyle='#007AFF'; ctx.beginPath(); ctx.arc(52,55,26,0,Math.PI*2); ctx.fill();
+  ctx.font='22px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#fff';
+  ctx.fillText('🔔',52,63);
+
+  // title
+  ctx.textAlign='left'; ctx.fillStyle='#FFFFFF';
+  ctx.font='bold 26px -apple-system,sans-serif';
+  ctx.fillText('แจ้งเตรียมงาน Lock Heat/Cert', 92, 46);
+  ctx.font='15px -apple-system,sans-serif'; ctx.fillStyle='#AEAEB2';
+  ctx.fillText(`📅 ${today}   ·   📦 ${rows.length} รายการ`, 92, 74);
+
+  // badge
+  ctx.fillStyle='#007AFF';
+  roundRect(ctx,W-90,18,72,74,14); ctx.fill();
+  ctx.fillStyle='#FFFFFF'; ctx.font='bold 34px -apple-system,sans-serif'; ctx.textAlign='center';
+  ctx.fillText(rows.length, W-54, 62);
+  ctx.font='12px -apple-system,sans-serif';
+  ctx.fillText('รายการ', W-54, 80);
+  ctx.textAlign='left';
+
+  // ── Rows
+  rows.forEach((r,i)=>{
+    const y = HEADER_H + PAD/2 + i*ROW_H;
+    ctx.fillStyle = i%2===0 ? '#FFFFFF' : '#F8F8FA';
+    roundRect(ctx, PAD, y, W-PAD*2, ROW_H-10, 14); ctx.fill();
+
+    // accent bar
+    ctx.fillStyle='#007AFF';
+    roundRect(ctx, PAD, y, 5, ROW_H-10, [3,0,0,3]); ctx.fill();
+
+    const lx = PAD+18;
+
+    // SO No.
+    ctx.fillStyle='#007AFF'; ctx.font='bold 14px -apple-system,sans-serif';
+    ctx.fillText(`${i+1}.  S.O: ${r.so_no||'-'}`, lx, y+22);
+
+    // คอลัมน์ layout: 3 คอลัมน์
+    const c1=lx, c2=lx+220, c3=lx+560;
+    const colW1=200, colW2=320, colW3=200;
+
+    // Label row 1
+    ctx.fillStyle='#8E8E93'; ctx.font='11px -apple-system,sans-serif';
+    ctx.fillText('ลูกค้า', c1, y+40);
+    ctx.fillText('รายการสินค้า', c2, y+40);
+    ctx.fillText('Qty / Batch', c3, y+40);
+
+    // Value row 1
+    ctx.fillStyle='#1C1C1E'; ctx.font='13px -apple-system,sans-serif';
+    wrapText(ctx, r.customer||'-', c1, y+57, colW1, 17);
+
+    // รายการสินค้า — wrap เต็ม
+    ctx.fillStyle='#1C1C1E'; ctx.font='13px -apple-system,sans-serif';
+    wrapText(ctx, r.product_name||'-', c2, y+57, colW2, 17);
+
+    ctx.fillStyle='#1C1C1E'; ctx.font='13px -apple-system,sans-serif';
+    ctx.fillText(`${r.qty||'-'}  /  ${r.batch||'-'}`, c3, y+57);
+
+    // Label row 2
+    ctx.fillStyle='#8E8E93'; ctx.font='11px -apple-system,sans-serif';
+    ctx.fillText('รหัสสินค้า', c1, y+88);
+    ctx.fillText('Heat No.', c2, y+88);
+    ctx.fillText('ผู้แจ้ง', c3, y+88);
+
+    // Value row 2
+    ctx.fillStyle='#3A3A3C'; ctx.font='12px -apple-system,sans-serif';
+    ctx.fillText(r.product_code||'-', c1, y+105);
+
+    ctx.fillStyle='#FF9500'; ctx.font='bold 14px -apple-system,sans-serif';
+    ctx.fillText(r.heat||'-', c2, y+105);
+
+    ctx.fillStyle='#34C759'; ctx.font='bold 13px -apple-system,sans-serif';
+    ctx.fillText(r.notifier||'-', c3, y+105);
+  });
+
+  // ── Footer
+  const fy = HEADER_H + PAD/2 + rows.length*ROW_H + 4;
+  ctx.fillStyle='#FFF4E0';
+  roundRect(ctx, PAD, fy, W-PAD*2, FOOTER_H-16, 12); ctx.fill();
+  ctx.fillStyle='#7A4A00'; ctx.font='bold 15px -apple-system,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('⏳  สถานะ: รอดำเนินการ', W/2, fy+30);
+  ctx.textAlign='left';
+
+  return canvas;
+}
+
+/* ── LINE NOTIFY ── */
+const LINE_TOKEN = 'u1mW/LDRaYc1/031pKfsIwb8WMtJKHuryoHhFUA9YrxRZ+zdPUBiarh5B+wX2777/64EgAS/iON/JKl/q1sEYQd3Oa6J3NA3fDImca5XYAXGNv0XIxVNGpzWedTfsqiaHXYOqDaO7ROZATnDsEfONgdB04t89/1O/w1cDnyilFU=';
+const LINE_GROUP = 'C9fcf1322a2e5098cb0c93f5afe9a7af5';
+
+async function sendLineMessage(rows){
+  try{
+    toast('กำลังสร้างรูปภาพ...','');
+
+    const CHUNK = 10;
+    const chunks = [];
+    for(let i=0;i<rows.length;i+=CHUNK) chunks.push(rows.slice(i,i+CHUNK));
+
+    const imageUrls = [];
+    for(let ci=0; ci<chunks.length; ci++){
+      // ── 1. วาด Canvas → Blob
+      const canvas = await generateTaskImage(chunks[ci]);
+      const blob   = await new Promise(res => canvas.toBlob(res, 'image/png', 0.95));
+      console.log(`[LINE] Chunk ${ci+1}: canvas ${canvas.width}x${canvas.height}, blob size ${blob.size} bytes`);
+
+      // ── 2. Upload ขึ้น Supabase Storage
+      const fname = `line_notify/${Date.now()}_part${ci+1}.png`;
+      console.log('[LINE] Uploading to:', fname);
+
+      const { data: upData, error: upErr } = await sb.storage.from(BUCKET).upload(fname, blob, {
+        upsert: true, contentType: 'image/png'
+      });
+
+      if(upErr){
+        console.error('[LINE] Upload error:', upErr);
+        toast('Upload รูปไม่สำเร็จ: '+upErr.message,'err');
+        // Fallback: แสดง preview ให้ดูรูปที่สร้างได้
+        showImagePreview(canvas);
+        return;
+      }
+
+      const { data: urlData } = sb.storage.from(BUCKET).getPublicUrl(fname);
+      const publicUrl = urlData.publicUrl;
+      console.log('[LINE] Public URL:', publicUrl);
+
+      // ตรวจสอบว่า URL เข้าถึงได้จริง
+      const checkRes = await fetch(publicUrl, { method: 'HEAD' }).catch(e=>({ok:false,status:'fetch error'}));
+      console.log('[LINE] URL check status:', checkRes.status);
+
+      imageUrls.push(publicUrl);
+    }
+
+    // ── 3. สร้าง LINE image messages
+    const messages = imageUrls.map(url => ({
+      type: 'image',
+      originalContentUrl: url,
+      previewImageUrl:    url
+    }));
+
+    console.log('[LINE] Sending messages:', JSON.stringify(messages));
+
+    // ── 4. ส่งผ่าน Edge Function
+    const res = await fetch('https://nvdvivlkucuvdfhvhwni.supabase.co/functions/v1/bright-task',{
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+SB_KEY },
+      body: JSON.stringify({ token: LINE_TOKEN, to: LINE_GROUP, messages })
+    });
+
+    const resText = await res.text();
+    console.log('[LINE] Edge Function response:', res.status, resText);
+
+    if(res.ok){
+      toast('ส่งรูปแจ้งเตือน LINE สำเร็จ ✓','ok');
+    } else {
+      console.error('[LINE] Failed:', resText);
+      toast('ส่ง LINE ไม่สำเร็จ — ดู Console (F12) สำหรับ error','err');
+      // แสดง response เพื่อ debug
+      alert('LINE API Error:\n'+resText);
+    }
+  }catch(e){
+    console.error('[LINE] Exception:', e);
+    toast('เกิดข้อผิดพลาด: '+e.message,'err');
+    alert('Error: '+e.message+'\n\nดู Console (F12) สำหรับรายละเอียด');
+  }
+}
+
+function showImagePreview(canvas){
+  const d = document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:800;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;';
+  const img = document.createElement('img');
+  img.src = canvas.toDataURL('image/png');
+  img.style.cssText='max-width:100%;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.5);';
+  const wrap = document.createElement('div');
+  wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:14px;';
+  const lbl = document.createElement('div');
+  lbl.style.cssText='color:white;font-size:13px;opacity:.8;';
+  lbl.textContent='Preview รูปที่จะส่ง LINE (คลิกพื้นหลังเพื่อปิด)';
+  wrap.appendChild(lbl); wrap.appendChild(img);
+  d.appendChild(wrap);
+  d.addEventListener('click', e=>{ if(e.target===d) d.remove(); });
+  document.body.appendChild(d);
+}
+
+function showLineFallback(msg){
+  // สร้าง popup ให้ copy ข้อความไปส่งเอง
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px;';
+  d.innerHTML=`
+    <div style="background:white;border-radius:20px;padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:36px;height:36px;background:#06c755;border-radius:10px;display:flex;align-items:center;justify-content:center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.03 2 11c0 3.58 2.12 6.69 5.24 8.39L6 22l3.32-1.65A10.6 10.6 0 0012 20c5.52 0 10-4.03 10-9S17.52 2 12 2z"/></svg>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:700">ข้อความ LINE พร้อมแล้ว</div>
+          <div style="font-size:12px;color:#6e6e73">กด Copy แล้วส่งในกลุ่ม LINE</div>
+        </div>
+      </div>
+      <textarea id="lineMsg" readonly style="width:100%;height:220px;border:1px solid #e5e5ea;border-radius:10px;padding:10px;font-size:12px;font-family:monospace;line-height:1.6;resize:none;outline:none;background:#f9f9f9">${msg}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button onclick="this.closest('div[style]').remove()" style="height:34px;padding:0 16px;border-radius:10px;background:#f2f2f7;border:.5px solid #d1d1d6;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">ปิด</button>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('lineMsg').value).then(()=>{this.textContent='คัดลอกแล้ว ✓';this.style.background='#34c759';})" style="height:34px;padding:0 16px;border-radius:10px;background:#06c755;color:white;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📋 Copy ข้อความ</button>
+      </div>
+    </div>`;
+  document.body.appendChild(d);
+  d.addEventListener('click',e=>{if(e.target===d)d.remove();});
+}
+
+/* ── EXCEL ── */
+function openExcelModal(){openModal('excelOverlay');}
+let excelParsedRows=[];
+
+function todayISO(){
+  return new Date().toISOString().slice(0,10);
+}
+function todayTH(){
+  return new Date().toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+function previewExcel(){
+  const raw=document.getElementById('excelTA').value.trim();
+  if(!raw){toast('กรุณาวางข้อมูลก่อน','err');return;}
+  const lines=raw.split('\n').filter(l=>l.trim());
+  excelParsedRows=lines.map(line=>{
+    const c=line.split('\t');
+    // คอลัมน์: 0=SO, 1=ลูกค้า, 2=รหัส, 3=รายการ, 4=Qty, 5=Batch, 6=ผู้แจ้ง, 7=Heat (หรืออื่นๆ)
+    return{
+      so_no:        (c[0]||'').trim(),
+      customer:     (c[1]||'').trim(),
+      product_code: (c[2]||'').trim(),
+      product_name: (c[3]||'').trim(),
+      qty:          parseFloat(c[4])||null,
+      batch:        (c[5]||'').trim(),
+      heat:         (c[6]||'').trim(),   // คอลัมน์ 7 (index 6) = Heat
+      notifier:     (c[7]||'').trim(),   // คอลัมน์ 8 (index 7) = ผู้แจ้ง
+      notify_date:  todayISO(),          // วันที่แจ้ง = วันปัจจุบัน
+      status:       'pending',
+      product_images: [],
+      cert_files:     []
+    };
+  }).filter(r=>r.so_no||r.customer);
+
+  if(!excelParsedRows.length){toast('ไม่พบข้อมูล','err');return;}
+
+  const prev=excelParsedRows.slice(0,5).map(r=>`
+    <tr>
+      <td style="padding:6px 8px">${r.so_no}</td>
+      <td style="padding:6px 8px">${r.customer}</td>
+      <td style="padding:6px 8px;font-family:monospace">${r.product_code}</td>
+      <td style="padding:6px 8px">${r.product_name}</td>
+      <td style="padding:6px 8px;text-align:right">${r.qty||''}</td>
+      <td style="padding:6px 8px;font-family:monospace">${r.batch||''}</td>
+      <td style="padding:6px 8px;color:var(--blue)">${r.heat||''}</td>
+      <td style="padding:6px 8px;color:var(--blue)">${r.notifier||''}</td>
+      <td style="padding:6px 8px;color:var(--green-text)">${todayTH()}</td>
+    </tr>`).join('');
+
+  document.getElementById('excelPreview').innerHTML=`
+    <div style="margin-top:12px;overflow-x:auto">
+    <div style="font-size:12px;color:var(--green-text);background:var(--green-bg);padding:7px 12px;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 7l3 3 7-7"/></svg>
+      วันที่แจ้ง = วันนี้ (${todayTH()}) · ผู้แจ้ง = คอลัมน์ที่ 8
+    </div>
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead><tr style="background:var(--surface2)">
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--text2)">S.O No.</th>
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--text2)">ลูกค้า</th>
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--text2)">รหัส</th>
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--text2)">รายการ</th>
+        <th style="padding:7px 8px;text-align:right;font-weight:600;color:var(--text2)">Qty</th>
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--text2)">Batch</th>
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--text2)">Heat</th>
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--blue)">ผู้แจ้ง</th>
+        <th style="padding:7px 8px;text-align:left;font-weight:600;color:var(--green-text)">วันที่แจ้ง</th>
+      </tr></thead>
+      <tbody>${prev}</tbody>
+    </table>
+    ${excelParsedRows.length>5?`<div style="font-size:12px;color:var(--text3);padding:6px 8px">...และอีก ${excelParsedRows.length-5} รายการ</div>`:''}
+    </div>`;
+
+  document.getElementById('excelCount').textContent=excelParsedRows.length;
+  document.getElementById('excelSaveBtn').style.display='';
+}
+
+async function importExcel(){
+  if(!excelParsedRows.length)return;
+  const btn=document.getElementById('excelSaveBtn');
+  btn.disabled=true; btn.textContent='กำลังนำเข้า...';
+  try{
+    const{data,error}=await sb.from(TABLE).insert(excelParsedRows).select();
+    if(error) throw error;
+    const imported = data||[];
+    records.unshift(...imported);
+
+    toast('นำเข้าสำเร็จ '+imported.length+' รายการ ✓','ok');
+    const savedRows=[...excelParsedRows];
+    excelParsedRows=[];
+    document.getElementById('excelTA').value='';
+    document.getElementById('excelPreview').innerHTML='';
+    document.getElementById('excelSaveBtn').style.display='none';
+    closeModal('excelOverlay');
+    updateStats(); renderTable();
+
+    // ── ส่ง LINE แจ้งเตือน
+    toast('กำลังส่งแจ้งเตือน LINE...','');
+    await sendLineMessage(savedRows);
+
+  }catch(e){
+    alert('นำเข้าล้มเหลว\nCode: '+(e.code||'')+'\n'+e.message);
+  }finally{
+    btn.disabled=false; btn.textContent='นำเข้า';
+  }
+}
+
+/* ── MODAL HELPERS ── */
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)closeModal(el.id);}));
+
+/* ── TOAST ── */
+function toast(msg,type=''){
+  const d=document.createElement('div');
+  d.className='toast'+(type?' '+type:'');d.textContent=msg;
+  document.getElementById('toasts').appendChild(d);
+  setTimeout(()=>d.remove(),3000);
+}
+</script>
+</body>
+</html>
